@@ -4,13 +4,17 @@ import os
 from mutagen import File
 import json
 
+directory = input("Please enter the directory you want to search: ")
+if not os.path.isdir(directory):
+    print("Invalid directory - please enter a valid directory to import songs from.")
+    exit(1)
+
 with open('config.json', 'r') as config_file:
     config = json.load(config_file)
 
 client_id = config['client_id']
 client_secret = config['client_secret']
 username = config['username']
-directory = config['directory']
 playlist_id = config['playlist_id']
 
 spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=client_id,
