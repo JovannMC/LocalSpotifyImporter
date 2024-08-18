@@ -4,27 +4,43 @@ import os
 from mutagen import File
 import json
 
+# Get directory to import songs from
 directory = input("Please enter the directory you want to search: ")
 if not os.path.isdir(directory):
     print("Invalid directory - please enter a valid directory to import songs from.")
     exit(1)
 
-with open('config.json', 'r') as config_file:
-    config = json.load(config_file)
+# Configuration file
+try:
+    with open('config.json', 'r') as config_file:
+        config = json.load(config_file)
+except Exception as e:
+    print(f"Error reading configuration file: {e}")
+    exit(1)
 
 client_id = config['client_id']
 client_secret = config['client_secret']
 username = config['username']
 playlist_id = config['playlist_id']
 
-spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=client_id,
-                                               client_secret=client_secret,
-                                               redirect_uri='http://localhost:8888/callback',
-                                               scope='playlist-modify-public playlist-modify-private'))
+if not all([client_id, client_secret, username, playlist_id]):
+    print("Invalid configuration detected, refer to 'config.json.example' for the correct format.")
+    exit(1)
+
+# Spotify authentication
+try:
+    spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=client_id,
+                                                        client_secret=client_secret,
+                                                        redirect_uri='http://localhost:8888/callback',
+                                                        scope='playlist-modify-public playlist-modify-private'))
+except spotipy.exceptions.SpotifyException as e:
+    print(f"Spotify authentication failed: {e}")
+    exit(1)
 
 not_found_songs = []
 not_added_songs = []
 
+# Process files in the directory
 for root, dirs, files in os.walk(directory):
     for filename in files:
         file_path = os.path.join(root, filename)
@@ -47,8 +63,12 @@ for root, dirs, files in os.walk(directory):
                 
                 if tracks:
                     track_id = tracks[0]['id']
-                    spotify.user_playlist_add_tracks(user=username, playlist_id=playlist_id, tracks=[track_id])
-                    print(f"Added '{title}' by '{artist}' to the playlist.")
+                    try:
+                        spotify.user_playlist_add_tracks(user=username, playlist_id=playlist_id, tracks=[track_id])
+                        print(f"Added '{title}' by '{artist}' to the playlist.")
+                    except spotipy.exceptions.SpotifyException as e:
+                        print(f"Failed to add track '{title}' by '{artist}' to the playlist: {e}")
+                        not_added_songs.append(f"'{title}' by '{artist}'")
                 else:
                     print(f"Unable to find '{title}' by '{artist}' on Spotify.")
                     not_found_songs.append(f"'{title}' by '{artist}'")
@@ -59,7 +79,7 @@ for root, dirs, files in os.walk(directory):
             print(f"Unsupported file format: {filename}")
             not_added_songs.append(filename)
 
-# Summary code
+# Print summary
 print("\nSummary of songs not found/added:")
 if not_found_songs:
     print("\nSongs not found on Spotify:")
